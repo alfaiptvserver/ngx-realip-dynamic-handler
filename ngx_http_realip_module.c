@@ -197,8 +197,8 @@ ngx_http_realip_handler(ngx_http_request_t *r)
         len = rlcf->header.len;
         p = rlcf->header.data;
 
+        /* Yeni başlık kontrolü */
         for (i = 0; /* void */ ; i++) {
-
             if (i >= part->nelts) {
                 if (part->next == NULL) {
                     break;
@@ -209,6 +209,21 @@ ngx_http_realip_handler(ngx_http_request_t *r)
                 i = 0;
             }
 
+            /* Öncelikle CF-Connecting-IP kontrolü */
+            if (ngx_strcmp("CF-Connecting-IP", (char *) header[i].key.data) == 0) {
+                value = &header[i].value;
+                xfwd = NULL;
+                goto found;
+            }
+
+            /* Eğer CF-Connecting-IP yoksa, X-Real-IP kontrolü */
+            if (ngx_strcmp("X-Real-IP", (char *) header[i].key.data) == 0) {
+                value = &header[i].value;
+                xfwd = NULL;
+                goto found;
+            }
+
+            /* Mevcut başlık kontrolü */
             if (hash == header[i].hash
                 && len == header[i].key.len
                 && ngx_strncmp(p, header[i].lowcase_key, len) == 0)
@@ -229,7 +244,6 @@ found:
 
     addr.sockaddr = c->sockaddr;
     addr.socklen = c->socklen;
-    /* addr.name = c->addr_text; */
 
     if (ngx_http_get_forwarded_addr(r, &addr, xfwd, value, rlcf->from,
                                     rlcf->recursive)
